@@ -1,0 +1,38 @@
+{
+  "name": "lambdamoo-mcp",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "packages/*"
+  ],
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "tsx --test packages/*/test/**/*.test.ts",
+    "extract:moo": "tsx packages/index-builder/src/cli/extract-moo.ts",
+    "ast:check": "tsx packages/index-builder/src/cli/ast-check.ts",
+    "descriptions:update": "tsx packages/index-builder/src/cli/descriptions-update.ts",
+    "descriptions:check": "tsx packages/index-builder/src/cli/descriptions-check.ts",
+    "cache:migrate": "tsx packages/index-builder/src/cli/cache-migrate.ts",
+    "build:index": "tsx packages/index-builder/src/cli/build-index.ts",
+    "refresh:core": "tsx packages/index-builder/src/cli/refresh-core.ts",
+    "mcp:start": "tsx packages/mcp-server/src/cli.ts",
+    "release:stage": "node scripts/prepare-release.mjs"
+  },
+  "devDependencies": {
+    "@types/node": "^26.2.0",
+    "tsx": "^4.23.12",
+    "typescript": "^7.0.2"
+  },
+  "allowScripts": {
+    "tree-sitter-lambdamoo@0.2.3": true,
+    "tree-sitter@0.25.1": true,
+    "sharp@0.32.6": true,
+    "esbuild@0.28.2": true,
+    "protobufjs@6.11.6": true
+  }
+}

@@ -1,0 +1,11 @@
+export const DEFAULT_INPUT = "moo_extract.jsonl";
+export const DEFAULT_CACHE = "embeddings_cache.jsonl";
+export const DEFAULT_OUTPUT = "build/core-moo-index.lancedb";
+export const DEFAULT_TABLE = "records";
+export const EMBEDDING_MODEL = "Xenova/all-MiniLM-L6-v2";
+export const EMBEDDING_DIMENSION = 384;
+export const PROMPT_VERSION = "moo-verb-summary-v1";
+export const CACHE_VERSION = 1 as const;
+export const DEFAULT_LLM_MODEL = "gpt-5.6-luna";
+export const DEFAULT_OLLAMA_URL = "http://localhost:11434/api";
+export const DEFAULT_BATCH_SIZE = 128;

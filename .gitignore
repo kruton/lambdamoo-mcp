@@ -1,0 +1,8 @@
+node_modules/
+dist/
+build/
+release/
+.transformers-cache/
+*.tmp
+*.log
+*.lancedb/

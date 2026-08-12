@@ -1,0 +1,88 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+
+concurrency:
+  group: release-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    env:
+      CI: "true"
+      TRANSFORMERS_CACHE: ${{ github.workspace }}/.transformers-cache
+    steps:
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          cache: npm
+          package-manager-cache: false
+      - uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: .transformers-cache
+          key: transformers-${{ runner.os }}-${{ hashFiles('package-lock.json') }}
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run ast:check
+      - run: npm run descriptions:check
+      - run: npm run build:index
+      - run: npm run build
+      - name: Stage the distributable MCP package
+        run: npm run release:stage -- "${GITHUB_REF_NAME}"
+      - name: Pack npm and standalone LanceDB artifacts
+        run: |
+          version="${GITHUB_REF_NAME#v}"
+          npm pack ./release/npm --pack-destination release/assets
+          tar -czf "release/assets/core-moo-index-${version}.tar.gz" -C build core-moo-index.lancedb
+          (cd release/assets && sha256sum ./*.tgz ./*.tar.gz > SHA256SUMS)
+      - name: Verify the packed npm package
+        run: npm install --global "release/assets/lambdamoo-mcp-server-${GITHUB_REF_NAME#v}.tgz"
+      - uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a # v7.0.1
+        with:
+          name: release-assets
+          path: release/assets/*
+          if-no-files-found: error
+          retention-days: 7
+
+  github-release:
+    needs: build
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-assets
+          path: release-assets
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release create "${GITHUB_REF_NAME}" release-assets/* --repo "${GITHUB_REPOSITORY}" --verify-tag --generate-notes --title "${GITHUB_REF_NAME}"
+
+  npm-publish:
+    needs: build
+    runs-on: ubuntu-latest
+    environment: npm
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c # v8.0.1
+        with:
+          name: release-assets
+          path: release-assets
+      - uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020 # v7.0.0
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+          package-manager-cache: false
+      - name: Publish to npmjs with trusted publishing
+        run: npm publish "release-assets/lambdamoo-mcp-server-${GITHUB_REF_NAME#v}.tgz" --access public
