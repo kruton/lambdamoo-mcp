@@ -14,3 +14,10 @@ LambdaMOO is not JavaScript. Write verb bodies as statements; do not add functio
 - A bare string used as a statement is a comment or docstring.
 - Prefer stable registry symbols such as \`$thing\`, \`$player\`, and \`$string_utils\` over database-local object numbers such as \`#5\`. Negative objects are stable sentinels: \`#-1\` is \`$nothing\`, \`#-2\` is \`$ambiguous_match\`, and \`#-3\` is \`$failed_match\`.
 `;
+
+export const LAMBDAMOO_CODING_WORKFLOW = `# LambdaMOO coding workflow
+
+Before returning newly written or modified LambdaMOO code, use \`check_moo_code\` and correct reported errors. Use \`format_moo_code\` when formatted source is requested; formatting refuses syntactically invalid source.
+`;
+
+export const LAMBDAMOO_SERVER_INSTRUCTIONS = `${LAMBDAMOO_CODING_WORKFLOW}\n${LAMBDAMOO_SYNTAX_PRIMER}`;
