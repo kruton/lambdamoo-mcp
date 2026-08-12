@@ -3,7 +3,7 @@ import test from "node:test";
 import { Client } from "@modelcontextprotocol/sdk/client/index.js";
 import { InMemoryTransport } from "@modelcontextprotocol/sdk/inMemory.js";
 import type { MooSearchRepository } from "../src/repository.js";
-import { LAMBDAMOO_SYNTAX_PRIMER, SYNTAX_PRIMER_URI } from "../src/primer.js";
+import { LAMBDAMOO_SERVER_INSTRUCTIONS, LAMBDAMOO_SYNTAX_PRIMER, SYNTAX_PRIMER_URI } from "../src/primer.js";
 import { createMcpServer } from "../src/server.js";
 
 const repository: MooSearchRepository = {
@@ -26,10 +26,16 @@ test("serves tools, structured results, instructions, and the primer resource", 
   try {
     await server.connect(serverTransport);
     await client.connect(clientTransport);
-    assert.equal(client.getInstructions(), LAMBDAMOO_SYNTAX_PRIMER);
+    assert.equal(client.getInstructions(), LAMBDAMOO_SERVER_INSTRUCTIONS);
 
     const tools = await client.listTools();
-    assert.deepEqual(tools.tools.map((tool) => tool.name).sort(), ["lookup_moo_symbol", "search_moo_help", "search_moo_verbs"]);
+    assert.deepEqual(tools.tools.map((tool) => tool.name).sort(), [
+      "check_moo_code",
+      "format_moo_code",
+      "lookup_moo_symbol",
+      "search_moo_help",
+      "search_moo_verbs",
+    ]);
 
     const resources = await client.listResources();
     assert.equal(resources.resources[0]?.uri, SYNTAX_PRIMER_URI);
@@ -45,6 +51,40 @@ test("serves tools, structured results, instructions, and the primer resource", 
     for (const forbidden of ["private-row-id", "private-parent-id", "private-database-id", '"vector"']) {
       assert.equal(serialized.includes(forbidden), false);
     }
+  } finally {
+    await client.close();
+    await server.close();
+  }
+});
+
+test("checks and formats LambdaMOO code with structured results", async () => {
+  const [clientTransport, serverTransport] = InMemoryTransport.createLinkedPair();
+  const server = createMcpServer(repository);
+  const client = new Client({ name: "test-client", version: "1.0.0" });
+  try {
+    await server.connect(serverTransport);
+    await client.connect(clientTransport);
+
+    const checked = await client.callTool({ name: "check_moo_code", arguments: { code: "return 1\n" } });
+    assert.equal(checked.isError, undefined);
+    const checkOutput = checked.structuredContent as { diagnostics: Array<{ code?: string }> };
+    assert.ok(checkOutput.diagnostics.some((item) => item.code === "missing-semicolon"));
+
+    const formatted = await client.callTool({
+      name: "format_moo_code",
+      arguments: { code: "if (ready)\nreturn;\nendif\n" },
+    });
+    assert.equal(formatted.isError, undefined);
+    assert.deepEqual(formatted.structuredContent, {
+      formatted: "if (ready)\n  return;\nendif\n",
+      diagnostics: [],
+    });
+
+    const invalid = await client.callTool({ name: "format_moo_code", arguments: { code: "if (ready)\nreturn;\n" } });
+    assert.equal(invalid.isError, true);
+    const invalidOutput = invalid.structuredContent as { formatted: string | null; diagnostics: unknown[] };
+    assert.equal(invalidOutput.formatted, null);
+    assert.ok(invalidOutput.diagnostics.length > 0);
   } finally {
     await client.close();
     await server.close();

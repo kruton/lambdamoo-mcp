@@ -2,7 +2,8 @@ import { McpServer } from "@modelcontextprotocol/sdk/server/mcp.js";
 import type { CallToolResult } from "@modelcontextprotocol/sdk/types.js";
 import { z } from "zod/v4";
 import type { MooSearchRepository } from "./repository.js";
-import { LAMBDAMOO_SYNTAX_PRIMER, SYNTAX_PRIMER_URI } from "./primer.js";
+import { checkMooCode, formatMooCode, presentDiagnostics } from "./language-tools.js";
+import { LAMBDAMOO_SERVER_INSTRUCTIONS, LAMBDAMOO_SYNTAX_PRIMER, SYNTAX_PRIMER_URI } from "./primer.js";
 import { presentHelpResults, presentSymbolResults, presentVerbResults } from "./presentation.js";
 
 const limitSchema = z.number().int().min(1).max(20).optional();
@@ -30,6 +31,16 @@ const symbolResultSchema = z.object({
   description: z.string().nullable(),
   code: z.string().nullable(),
 });
+const positionSchema = z.object({ line: z.number().int().nonnegative(), character: z.number().int().nonnegative() });
+const rangeSchema = z.object({ start: positionSchema, end: positionSchema });
+const diagnosticSchema = z.object({
+  range: rangeSchema,
+  severity: z.union([z.literal(1), z.literal(2), z.literal(3), z.literal(4)]).optional(),
+  code: z.union([z.number(), z.string()]).optional(),
+  source: z.string().optional(),
+  message: z.string(),
+}).passthrough();
+const codeSchema = z.string().max(1_000_000);
 
 export type DiagnosticWriter = (message: string) => void;
 
@@ -39,7 +50,7 @@ export function createMcpServer(
 ): McpServer {
   const server = new McpServer(
     { name: "lambdamoo-mcp", version: "0.1.0" },
-    { instructions: LAMBDAMOO_SYNTAX_PRIMER },
+    { instructions: LAMBDAMOO_SERVER_INSTRUCTIONS },
   );
 
   server.registerResource(
@@ -51,6 +62,52 @@ export function createMcpServer(
       mimeType: "text/markdown",
     },
     async (uri) => ({ contents: [{ uri: uri.href, mimeType: "text/markdown", text: LAMBDAMOO_SYNTAX_PRIMER }] }),
+  );
+
+  server.registerTool(
+    "check_moo_code",
+    {
+      title: "Check LambdaMOO code",
+      description: "Parse LambdaMOO source and return precise syntax diagnostics.",
+      inputSchema: { code: codeSchema },
+      outputSchema: { diagnostics: z.array(diagnosticSchema) },
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ code }): Promise<CallToolResult> => {
+      try {
+        const result = await checkMooCode(code);
+        return {
+          content: [{ type: "text", text: presentDiagnostics(result.diagnostics) }],
+          structuredContent: { diagnostics: result.diagnostics },
+        };
+      } catch (error) {
+        return languageToolError("check_moo_code", diagnostic, error);
+      }
+    },
+  );
+
+  server.registerTool(
+    "format_moo_code",
+    {
+      title: "Format LambdaMOO code",
+      description: "Format valid LambdaMOO source. Invalid source is returned with syntax diagnostics instead.",
+      inputSchema: { code: codeSchema },
+      outputSchema: { formatted: z.string().nullable(), diagnostics: z.array(diagnosticSchema) },
+      annotations: { readOnlyHint: true, idempotentHint: true, openWorldHint: false },
+    },
+    async ({ code }): Promise<CallToolResult> => {
+      try {
+        const result = await formatMooCode(code);
+        const text = result.formatted ?? `Unable to format invalid LambdaMOO source:\n${presentDiagnostics(result.diagnostics)}`;
+        return {
+          content: [{ type: "text", text }],
+          structuredContent: { formatted: result.formatted, diagnostics: result.diagnostics },
+          ...(result.formatted === null ? { isError: true } : {}),
+        };
+      } catch (error) {
+        return languageToolError("format_moo_code", diagnostic, error);
+      }
+    },
   );
 
   server.registerTool(
@@ -111,6 +168,12 @@ export function createMcpServer(
   );
 
   return server;
+}
+
+function languageToolError(name: string, diagnostic: DiagnosticWriter, error: unknown): CallToolResult {
+  const message = error instanceof Error ? error.message : String(error);
+  diagnostic(`${name}: ${message}`);
+  return { content: [{ type: "text", text: `Unable to complete ${name}: ${message}` }], isError: true };
 }
 
 async function toolResult(
