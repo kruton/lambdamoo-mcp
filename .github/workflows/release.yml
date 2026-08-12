@@ -85,4 +85,4 @@ jobs:
           registry-url: https://registry.npmjs.org
           package-manager-cache: false
       - name: Publish to npmjs with trusted publishing
-        run: npm publish "release-assets/lambdamoo-mcp-server-${GITHUB_REF_NAME#v}.tgz" --access public
+        run: npm publish "./release-assets/lambdamoo-mcp-server-${GITHUB_REF_NAME#v}.tgz" --access public
