@@ -7,7 +7,7 @@
     "@lambdamoo-mcp/core": "0.1.0",
     "@lancedb/lancedb": "^0.37.0",
     "apache-arrow": "21.2.0",
-    "openai": "^6.22.0",
+    "openai": "^7.0.0",
     "tree-sitter": "^0.25.1",
     "tree-sitter-lambdamoo": "^0.2.3"
   }
