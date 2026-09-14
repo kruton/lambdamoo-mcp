@@ -9,6 +9,6 @@
     "@lambdamoo-mcp/core": "0.1.0",
     "@lancedb/lancedb": "^0.38.0",
     "@modelcontextprotocol/sdk": "1.30.0",
-    "zod": "4.6.2"
+    "zod": "4.6.5"
   }
 }
