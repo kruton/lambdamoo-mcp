@@ -7,7 +7,7 @@
   "dependencies": {
     "@kruton/moo-lsp": "0.3.0",
     "@lambdamoo-mcp/core": "0.1.0",
-    "@lancedb/lancedb": "^0.38.0",
+    "@lancedb/lancedb": "^0.40.0",
     "@modelcontextprotocol/sdk": "1.31.0",
     "zod": "4.6.2"
   }
